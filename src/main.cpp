@@ -21,6 +21,7 @@
  */
 
 #include <err.h>
+
 #include <opencv2/opencv.hpp>
 #include <opencv2/tracking.hpp>
 
@@ -34,17 +35,184 @@
 #define TIMEOUT_S       10               // Tracking timeout in seconds
 #define TRACKER_TYPE    "MEDIANFLOW"
 
-DxlServo    g_servo1(1);
+void	plot_stats(Gnuplot & gp,
+		   int x,
+		   double y1,
+		   double y2,
+		   double y3,
+		   double y4,
+		   double y5);
+
 Gnuplot     g_gp;
+
 Timer       g_timer;
 
-float       g_speedSetpoint;
+DxlServo    g_servo1(1);
+DxlServo    g_servo2(2);
+
+float       g_speedSetpoint;	// Debug (for plotting curves)
+
+float	    g_prevTime = g_timer.getTime();
 
 enum eState
 {
     IDLE,
     TRACKING
 };
+
+void    idleActions(enum eState& state, FaceDetector& faceDetect, cv::Mat& frame, cv::Rect& box)
+{
+    g_servo1.setMovingSpeed(0);
+    box = faceDetect.detect(frame);
+    if (box.area() > 0)
+        state = TRACKING;
+    g_prevTime = g_timer.getTime();
+}
+
+void	displayInfo(cv::Mat& frame, float errorX, float errorY)
+{
+  cv::line(frame,
+	   cv::Point(frame.cols / 2, frame.rows / 2),
+	   cv::Point(frame.cols / 2 - (int)errorX, frame.rows / 2),
+	   cv::Scalar(0, 255, 0));
+  cv::line(frame,
+	   cv::Point(frame.cols / 2, frame.rows / 2),
+	   cv::Point(frame.cols / 2, frame.rows / 2 - (int)errorY),
+	   cv::Scalar(255, 0, 0));
+  cv::line(frame,
+	   cv::Point(frame.cols / 2, frame.rows / 2),
+	   cv::Point(frame.cols / 2 - (int)errorX, frame.rows / 2 - (int)errorY),
+	   cv::Scalar(0, 0, 255));
+}
+
+void    armCorrectPosition(cv::Mat& frame, cv::Rect& face)
+{
+    static bool         servo1Initialized = false;
+    static bool         servo2Initialized = false;
+    float		currentTime = g_timer.getTime();
+    float               errorX = (frame.cols / 2.f) - (face.x + face.width / 2.f);
+    float               errorY = (frame.rows / 2.f) - (face.y + face.height / 2.f);
+    float               p1 = 0.0012;
+    float               p2 = 0.0012;
+    float		speedCommand1 = 0;
+    float		speedCommand2 = 0;
+    float		posCommand1;
+    float		posCommand2;
+
+    displayInfo(frame, errorX, errorY);
+    if (!servo1Initialized)
+    {
+        if (!g_servo1.init())
+            throw std::exception();
+	g_servo1.setCWAngleLimit(0);
+        g_servo1.setCCWAngleLimit(1); // Servo now set to joint mode
+	g_servo1.setMovingSpeed(0.5);
+        servo1Initialized = true;
+    }
+    if (!servo2Initialized)
+    {
+        if (!g_servo2.init())
+            throw std::exception();
+	g_servo2.setCWAngleLimit(0.25);
+        g_servo2.setCCWAngleLimit(0.5); // Servo now set to joint mode
+	g_servo2.setMovingSpeed(0.5);
+        servo2Initialized = true;
+    }
+    speedCommand1 = p1 * errorX;
+    posCommand1 = g_servo1.presentPos() + (currentTime - g_prevTime) / 1000000.f * speedCommand1;
+    g_servo1.setGoalPos(posCommand1);
+
+    g_speedSetpoint = speedCommand1; // debug
+
+    speedCommand2 = -p2 * errorY;
+    posCommand2 = g_servo2.presentPos() + (currentTime - g_prevTime) / 1000000.f * speedCommand2;
+    g_servo2.setGoalPos(posCommand2);
+
+    g_prevTime = currentTime;
+}
+
+void    trackingActions(enum eState& state,
+			cv::Ptr<cv::Tracker>& tracker,
+			cv::Mat& frame,
+			cv::Rect& box)
+{
+    static float    currentTime = g_timer.getTime();
+    static float    timeoutStart = 0;
+    static bool     initialized = false;
+    cv::Rect2d      box2d = box;                    // Type needed by tracker (wtf ?)
+
+    currentTime = g_timer.getTime();
+    if (!initialized)
+    {
+        timeoutStart = currentTime;
+        if (!tracker->init(frame, box2d))
+        {
+            std::cerr << "tracker init failed" << std::endl;
+            state = IDLE;
+            return;
+        }
+        else
+            initialized = true;
+    }
+    else
+    {
+        if (currentTime - timeoutStart > TIMEOUT_S * 1000000)
+            std::cout << "************ Timeout ! ************" << std::endl;
+        if (!tracker->update(frame, box2d)
+            || currentTime - timeoutStart > TIMEOUT_S * 1000000) // Timeout
+        {
+	    g_servo1.setMovingSpeed(0);
+            tracker.release();
+            tracker = cv::Tracker::create(TRACKER_TYPE);
+            initialized = false;
+            state = IDLE;
+            return;
+        }
+        box = box2d;
+        armCorrectPosition(frame, box);
+    }
+}
+
+int main()
+{
+    cv::VideoCapture        cap(1);
+    cv::Mat                 frame;
+    FaceDetector            faceDetect("resources/haarcascade_frontalface_alt.xml");
+    cv::Ptr<cv::Tracker>    tracker = cv::Tracker::create(TRACKER_TYPE);    //  "MIL", "BOOSTING", "MEDIANFLOW", "TLD"
+    cv::Rect                box;
+    enum eState             state = IDLE;
+
+    if (!DxlServo::devInit(0))
+        errx(EXIT_FAILURE, "error: could not initialize dxl serial device %d", 0);
+    if (!cap.isOpened())
+        errx(EXIT_FAILURE, "error: could not open video capture");
+    cv::namedWindow("frame", cv::WINDOW_KEEPRATIO);
+    while (cv::waitKey(30) < 0)
+    {
+        cap >> frame;
+        switch (state)
+        {
+            case IDLE:
+            std::cout << "idle..." << std::endl;
+                idleActions(state, faceDetect, frame, box);
+                break;
+            case TRACKING:
+                std::cout << "tracking..." << std::endl;
+                trackingActions(state, tracker, frame, box);
+                break;
+        }
+        cv::rectangle(frame, box, cv::Scalar(127, 127, 0), 2, 2);
+        cv::imshow("frame", frame);
+	plot_stats(g_gp,
+		   g_timer.getTime(),
+		   g_speedSetpoint,
+		   g_servo1.presentSpeed(),
+		   state / 2,
+		   g_servo1.presentPos(),
+		   0);
+    }
+    return 0;
+}
 
 void	plot_stats(Gnuplot & gp,
 		   int x,
@@ -125,139 +293,4 @@ void	plot_stats(Gnuplot & gp,
   gp.send1d(y3Data);
   gp.send1d(y4Data);
   gp.send1d(y5Data);
-}
-
-void    idleActions(enum eState& state, FaceDetector& faceDetect, cv::Mat& frame, cv::Rect& box)
-{
-    g_servo1.setMovingSpeed(0);
-    box = faceDetect.detect(frame);
-    if (box.area() > 0)
-        state = TRACKING;
-}
-
-void	displayInfo(cv::Mat& frame, float errorX, float errorY)
-{
-  cv::line(frame,
-	   cv::Point(frame.cols / 2, frame.rows / 2),
-	   cv::Point(frame.cols / 2 - (int)errorX, frame.rows / 2),
-	   cv::Scalar(0, 255, 0));
-  cv::line(frame,
-	   cv::Point(frame.cols / 2, frame.rows / 2),
-	   cv::Point(frame.cols / 2, frame.rows / 2 - (int)errorY),
-	   cv::Scalar(255, 0, 0));
-  cv::line(frame,
-	   cv::Point(frame.cols / 2, frame.rows / 2),
-	   cv::Point(frame.cols / 2 - (int)errorX, frame.rows / 2 - (int)errorY),
-	   cv::Scalar(0, 0, 255));
-}
-
-void    armCorrectPosition(cv::Mat& frame, cv::Rect& face)
-{
-    static bool         servo1Initialized = false;
-    static float	prevTime = g_timer.getTime();
-    float		currentTime = g_timer.getTime();
-    float               errorX = (frame.cols / 2.f) - (face.x + face.width / 2.f);
-    float               errorY = (frame.rows / 2.f) - (face.y + face.height / 2.f);
-    float               p = 0.0015;
-    float		speedCommand = 0;
-    float		posCommand;
-
-    displayInfo(frame, errorX, errorY);
-    if (!servo1Initialized)
-    {
-        if (!g_servo1.init())
-            throw std::exception();
-	g_servo1.setCWAngleLimit(0);
-        g_servo1.setCCWAngleLimit(1); // Servo now set to joint mode
-	g_servo1.setMovingSpeed(1);
-        servo1Initialized = true;
-    }
-    speedCommand = p * errorX;
-    posCommand = g_servo1.presentPos() + (currentTime - prevTime) * speedCommand;
-    g_servo1.setGoalPos(posCommand);
-    prevTime = currentTime;
-    g_speedSetpoint = speedCommand; // debug
-}
-
-void    trackingActions(enum eState& state,
-			cv::Ptr<cv::Tracker>& tracker,
-			cv::Mat& frame,
-			cv::Rect& box)
-{
-    static float    currentTime = g_timer.getTime();
-    static float    timeoutStart = 0;
-    static bool     initialized = false;
-    cv::Rect2d      box2d = box;                    // Type needed by tracker (wtf ?)
-
-    currentTime = g_timer.getTime();
-    if (!initialized)
-    {
-        timeoutStart = currentTime;
-        if (!tracker->init(frame, box2d))
-        {
-            std::cerr << "tracker init failed" << std::endl;
-            state = IDLE;
-            return;
-        }
-        else
-            initialized = true;
-    }
-    else
-    {
-        if (currentTime - timeoutStart > TIMEOUT_S * 1000000)
-            std::cout << "************ Timeout ! ************" << std::endl;
-        if (!tracker->update(frame, box2d)
-            || currentTime - timeoutStart > TIMEOUT_S * 1000000) // Timeout
-        {
-	    g_servo1.setMovingSpeed(0);
-            tracker.release();
-            tracker = cv::Tracker::create(TRACKER_TYPE);
-            initialized = false;
-            state = IDLE;
-            return;
-        }
-        box = box2d;
-        armCorrectPosition(frame, box);
-    }
-}
-
-int main()
-{
-    cv::VideoCapture        cap(1);
-    cv::Mat                 frame;
-    FaceDetector            faceDetect("resources/haarcascade_frontalface_alt.xml");
-    cv::Ptr<cv::Tracker>    tracker = cv::Tracker::create(TRACKER_TYPE);    //  "MIL", "BOOSTING", "MEDIANFLOW", "TLD"
-    cv::Rect                box;
-    enum eState             state = IDLE;
-
-    if (!DxlServo::devInit(0))
-        errx(EXIT_FAILURE, "error: could not initialize dxl serial device %d", 0);
-    if (!cap.isOpened())
-        errx(EXIT_FAILURE, "error: could not open video capture");
-    cv::namedWindow("frame", cv::WINDOW_KEEPRATIO);
-    while (cv::waitKey(30) < 0)
-    {
-        cap >> frame;
-        switch (state)
-        {
-            case IDLE:
-            std::cout << "idle..." << std::endl;
-                idleActions(state, faceDetect, frame, box);
-                break;
-            case TRACKING:
-                std::cout << "tracking..." << std::endl;
-                trackingActions(state, tracker, frame, box);
-                break;
-        }
-        cv::rectangle(frame, box, cv::Scalar(127, 127, 0), 2, 2);
-        cv::imshow("frame", frame);
-	plot_stats(g_gp,
-		   g_timer.getTime(),
-		   g_speedSetpoint,
-		   g_servo1.presentSpeed(),
-		   state / 2,
-		   0,
-		   0);
-    }
-    return 0;
 }
