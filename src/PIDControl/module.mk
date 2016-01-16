@@ -20,11 +20,8 @@
 # SOFTWARE.
 #
 
-SRCS		:=	FaceDetector.cpp	\
-			main.cpp
+THIS_DIR_L0	:=	PIDControl
 
-SUBDIRS		+=	Timer		\
-			PIDControl
+MOD_SRC		:=	PIDControl.cpp
 
-include $(SRCDIR)/Timer/module.mk
-include $(SRCDIR)/PIDControl/module.mk
+SRCS		+= $(addprefix $(THIS_DIR_L0)/, $(MOD_SRC))

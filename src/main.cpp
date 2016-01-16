@@ -29,6 +29,7 @@
 
 #include "DxlServo.hh"
 #include "FaceDetector.hh"
+#include "PIDControl.hh"
 #include "Timer.hh"
 
 #define PLOT_MAX_S	30               // in second
@@ -92,8 +93,8 @@ void    armCorrectPosition(cv::Mat& frame, cv::Rect& face)
     float		currentTime = g_timer.getTime();
     float               errorX = (frame.cols / 2.f) - (face.x + face.width / 2.f);
     float               errorY = (frame.rows / 2.f) - (face.y + face.height / 2.f);
-    float               p1 = 0.0012;
-    float               p2 = 0.0012;
+    static PIDControl	pid1(0.0012, 0.00075, 0.00005, 1, 10);
+    static PIDControl	pid2(0.0012, 0.00075, 0.00005, 1, 10);
     float		speedCommand1 = 0;
     float		speedCommand2 = 0;
     float		posCommand1;
@@ -118,13 +119,18 @@ void    armCorrectPosition(cv::Mat& frame, cv::Rect& face)
 	g_servo2.setMovingSpeed(0.5);
         servo2Initialized = true;
     }
-    speedCommand1 = p1 * errorX;
+
+    pid1.set_dt((currentTime - g_prevTime) / 1000000.f);
+    pid1.set_input_filter_all(errorX);
+    speedCommand1 = pid1.get_pid();
     posCommand1 = g_servo1.presentPos() + (currentTime - g_prevTime) / 1000000.f * speedCommand1;
     g_servo1.setGoalPos(posCommand1);
 
     g_speedSetpoint = speedCommand1; // debug
 
-    speedCommand2 = -p2 * errorY;
+    pid2.set_dt((currentTime - g_prevTime) / 1000000.f);
+    pid2.set_input_filter_all(-errorY);
+    speedCommand2 = pid2.get_pid();
     posCommand2 = g_servo2.presentPos() + (currentTime - g_prevTime) / 1000000.f * speedCommand2;
     g_servo2.setGoalPos(posCommand2);
 
