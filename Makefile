@@ -73,6 +73,10 @@ showflags:
 	@printf "[\033[0;33mLinker flags\033[0m] %s\n"
 	@echo $(LDFLAGS)
 
+dxlservo:
+	@printf "[\033[0;34mBuilding library\033[0m] %s\n" "dxlservo"
+	@make -C dxlservo
+
 -include $(DEPS)
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.c
@@ -83,9 +87,7 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.cpp
 	@printf "[\033[0;32mCompiling\033[0m] %s\n" $<
 	@$(COMPILE.cpp) $(OUTPUT_OPTION) $<
 
-$(NAME): $(OBJS)
-	@printf "[\033[0;34mBuilding library\033[0m] %s\n" "dxlservo"
-	@make -C dxlservo
+$(NAME): $(OBJS) dxlservo
 	@printf "[\033[0;33mLinker flags\033[0m] %s\n"
 	@echo $(LDFLAGS)
 	@printf "[\033[0;34mLinking\033[0m] %s\n" $(NAME)
@@ -116,4 +118,4 @@ fclean: clean
 
 re:	fclean all
 
-.PHONY:	all clean fclean re
+.PHONY:	all clean fclean re dxlservo
