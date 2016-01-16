@@ -42,7 +42,7 @@ std::vector<cv::Rect>   FaceDetector::detectMulti(cv::Mat &frame)
     _cascade.detectMultiScale(gray,
                               faces,
                               1.1,               // Todo: why 1.1 ?
-                              2,                 // Todo: why 2 ?
+                              7,		 // minNeighbors
                               0, // cv::CASCADE_SCALE_IMAGE,
                               cv::Size(30, 30)); // Todo: optimize size ?
     return faces;
