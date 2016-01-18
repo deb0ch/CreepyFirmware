@@ -51,6 +51,8 @@ DxlServo    g_servo1(1);
 DxlServo    g_servo2(2);
 
 float       g_speedSetpoint;	// Debug (for plotting curves)
+float       g_posCommand;	// Debug (for plotting curves)
+float       g_dt;		// Debug (for plotting curves)
 
 float	    g_prevTime = g_timer.getTime();
 
@@ -92,8 +94,8 @@ void    armCorrectPosition(cv::Mat& frame, cv::Rect& face)
     float		currentTime = g_timer.getTime();
     float               errorX = (frame.cols / 2.f) - (face.x + face.width / 2.f);
     float               errorY = (frame.rows / 2.f) - (face.y + face.height / 2.f);
-    static PIDControl	pid1(0.0012, 0.00075, 0.00005, 1, 10);
-    static PIDControl	pid2(0.0012, 0.00075, 0.00005, 1, 10);
+    static PIDControl	pid1(0.0015, 0, 0, 0, 10);
+    static PIDControl	pid2(0.0015, 0, 0, 0, 10);
     float		speedCommand1 = 0;
     float		speedCommand2 = 0;
     float		posCommand1;
@@ -126,6 +128,8 @@ void    armCorrectPosition(cv::Mat& frame, cv::Rect& face)
     g_servo1.setGoalPos(posCommand1);
 
     g_speedSetpoint = speedCommand1; // debug
+    g_posCommand = posCommand1;
+    g_dt = (currentTime - g_prevTime) / 100000.f;
 
     pid2.set_dt((currentTime - g_prevTime) / 1000000.f);
     pid2.set_input_filter_all(-errorY);
@@ -208,9 +212,9 @@ int main()
 		   g_timer.getTime(),
 		   g_speedSetpoint,
 		   g_servo1.presentSpeed(),
-		   state / 2,
 		   g_servo1.presentPos(),
-		   0);
+		   g_posCommand,
+		   g_dt);
     }
     return 0;
 }
@@ -282,11 +286,11 @@ void	plot_stats(Gnuplot & gp,
      << ", "
      << "'-' with lines title 'real speed'"
      << ", "
-     << "'-' with lines title 'mode'"
+     << "'-' with lines title 'position'"
      << ", "
-     << "'-' with lines title '-'"
+     << "'-' with lines title 'position command'"
      << ", "
-     << "'-' with lines title '-'"
+     << "'-' with lines title 'dt'"
      << "\n";
 
   gp.send1d(y1Data);
