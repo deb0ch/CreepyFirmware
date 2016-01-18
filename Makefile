@@ -42,7 +42,7 @@ DEPS			:= $(OBJS:.o=.d)
 
 TMPS			:= $(OBJS) $(OBJS:.o=.d)
 
-CXXFLAGS		+= -W -Wall -Wextra -Werror
+CXXFLAGS		+= -W -Wall -Wextra
 CXXFLAGS		+= -std=c++11
 CXXFLAGS		+= -O3
 CXXFLAGS		+= -MD
