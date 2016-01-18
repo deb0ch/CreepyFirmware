@@ -23,18 +23,17 @@
 #include <err.h>
 
 #include <opencv2/opencv.hpp>
-#include <opencv2/tracking.hpp>
 
 #include "gnuplot-iostream.h"
 
 #include "DxlServo.hh"
 #include "FaceDetector.hh"
+#include "FaceTracker.hh"
 #include "PIDControl.hh"
 #include "Timer.hh"
 
 #define PLOT_MAX_S	30               // in second
 #define TIMEOUT_S       10               // Tracking timeout in seconds
-#define TRACKER_TYPE    "MEDIANFLOW"
 
 void	plot_stats(Gnuplot & gp,
 		   int x,
@@ -102,23 +101,23 @@ void    armCorrectPosition(cv::Mat& frame, cv::Rect& face)
 
     displayInfo(frame, errorX, errorY);
     if (!servo1Initialized)
-    {
-        if (!g_servo1.init())
-            throw std::exception();
+      {
+	if (!g_servo1.init())
+	  throw std::exception();
 	g_servo1.setCWAngleLimit(0);
-        g_servo1.setCCWAngleLimit(1); // Servo now set to joint mode
+	g_servo1.setCCWAngleLimit(1); // Servo now set to joint mode
 	g_servo1.setMovingSpeed(0.5);
-        servo1Initialized = true;
-    }
+	servo1Initialized = true;
+      }
     if (!servo2Initialized)
-    {
+      {
         if (!g_servo2.init())
-            throw std::exception();
-	g_servo2.setCWAngleLimit(0.25);
+	  throw std::exception();
+        g_servo2.setCWAngleLimit(0.25);
         g_servo2.setCCWAngleLimit(0.5); // Servo now set to joint mode
-	g_servo2.setMovingSpeed(0.5);
+        g_servo2.setMovingSpeed(0.5);
         servo2Initialized = true;
-    }
+      }
 
     pid1.set_dt((currentTime - g_prevTime) / 1000000.f);
     pid1.set_input_filter_all(errorX);
@@ -138,20 +137,19 @@ void    armCorrectPosition(cv::Mat& frame, cv::Rect& face)
 }
 
 void    trackingActions(enum eState& state,
-			cv::Ptr<cv::Tracker>& tracker,
+			FaceTracker& tracker,
 			cv::Mat& frame,
 			cv::Rect& box)
 {
     static float    currentTime = g_timer.getTime();
     static float    timeoutStart = 0;
     static bool     initialized = false;
-    cv::Rect2d      box2d = box;                    // Type needed by tracker (wtf ?)
 
     currentTime = g_timer.getTime();
     if (!initialized)
     {
         timeoutStart = currentTime;
-        if (!tracker->init(frame, box2d))
+        if (!tracker.init(frame, box))
         {
             std::cerr << "tracker init failed" << std::endl;
             state = IDLE;
@@ -164,17 +162,14 @@ void    trackingActions(enum eState& state,
     {
         if (currentTime - timeoutStart > TIMEOUT_S * 1000000)
             std::cout << "************ Timeout ! ************" << std::endl;
-        if (!tracker->update(frame, box2d)
+        if (!tracker.update(frame, box)
             || currentTime - timeoutStart > TIMEOUT_S * 1000000) // Timeout
         {
-	    g_servo1.setMovingSpeed(0);
             tracker.release();
-            tracker = cv::Tracker::create(TRACKER_TYPE);
             initialized = false;
             state = IDLE;
             return;
         }
-        box = box2d;
         armCorrectPosition(frame, box);
     }
 }
@@ -184,7 +179,7 @@ int main()
     cv::VideoCapture        cap(1);
     cv::Mat                 frame;
     FaceDetector            faceDetect("resources/haarcascade_frontalface_alt.xml");
-    cv::Ptr<cv::Tracker>    tracker = cv::Tracker::create(TRACKER_TYPE);    //  "MIL", "BOOSTING", "MEDIANFLOW", "TLD"
+    FaceTracker		    tracker;
     cv::Rect                box;
     enum eState             state = IDLE;
 

@@ -21,6 +21,7 @@
 #
 
 SRCS		:=	FaceDetector.cpp	\
+			FaceTracker.cpp		\
 			main.cpp
 
 SUBDIRS		+=	Timer		\
