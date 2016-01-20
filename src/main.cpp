@@ -52,9 +52,6 @@ DxlServo    g_servo2(2);
 
 float       g_speedSetpoint;	// Debug (for plotting curves)
 float       g_posCommand;	// Debug (for plotting curves)
-float       g_dt;		// Debug (for plotting curves)
-
-float	    g_prevTime = g_timer.getTime();
 
 enum eState
 {
@@ -62,17 +59,19 @@ enum eState
     TRACKING
 };
 
-void    idleActions(enum eState& state, FaceDetector& faceDetect, cv::Mat& frame, cv::Rect& box)
+void	overlayFps(cv::Mat& frame, float dt)
 {
-    g_servo1.setMovingSpeed(0);
-    box = faceDetect.detect(frame);
-    if (box.area() > 0)
-        state = TRACKING;
-    g_prevTime = g_timer.getTime();
+  cv::putText(frame,
+	      "fps: " + std::to_string(1.f / dt).substr(0, 4),
+	      cv::Point(20, frame.rows - 20),
+	      CV_FONT_HERSHEY_SCRIPT_COMPLEX,
+	      0.75,
+	      cvScalar(0, 0, 255));
 }
 
-void	displayInfo(cv::Mat& frame, float errorX, float errorY)
+void	overlayTrackingInfo(cv::Mat& frame, cv::Rect box, float errorX, float errorY)
 {
+  cv::rectangle(frame, box, cv::Scalar(127, 127, 0), 2, 2);
   cv::line(frame,
 	   cv::Point(frame.cols / 2, frame.rows / 2),
 	   cv::Point(frame.cols / 2 - (int)errorX, frame.rows / 2),
@@ -87,72 +86,86 @@ void	displayInfo(cv::Mat& frame, float errorX, float errorY)
 	   cv::Scalar(0, 0, 255));
 }
 
-void    armCorrectPosition(cv::Mat& frame, cv::Rect& face)
+void    armCorrectPosition(cv::Mat& frame, cv::Rect& face, float dt, int &skipFrames)
 {
-    static bool         servo1Initialized = false;
-    static bool         servo2Initialized = false;
-    float		currentTime = g_timer.getTime();
-    float               errorX = (frame.cols / 2.f) - (face.x + face.width / 2.f);
-    float               errorY = (frame.rows / 2.f) - (face.y + face.height / 2.f);
     static PIDControl	pid1(0.0015, 0, 0, 0, 10);
     static PIDControl	pid2(0.0015, 0, 0, 0, 10);
-    float		speedCommand1 = 0;
-    float		speedCommand2 = 0;
-    float		posCommand1;
-    float		posCommand2;
+    float               errorX = (frame.cols / 2.f) - (face.x + face.width / 2.f);
+    float               errorY = (frame.rows / 2.f) - (face.y + face.height / 2.f);
+    float		speedCommand;
+    float		posCommand;
 
-    displayInfo(frame, errorX, errorY);
-    if (!servo1Initialized)
-      {
-	if (!g_servo1.init())
-	  throw std::exception();
-	g_servo1.setCWAngleLimit(0);
-	g_servo1.setCCWAngleLimit(1); // Servo now set to joint mode
-	g_servo1.setMovingSpeed(0.5);
-	servo1Initialized = true;
-      }
-    if (!servo2Initialized)
-      {
-        if (!g_servo2.init())
-	  throw std::exception();
-        g_servo2.setCWAngleLimit(0.25);
-        g_servo2.setCCWAngleLimit(0.5); // Servo now set to joint mode
-        g_servo2.setMovingSpeed(0.5);
-        servo2Initialized = true;
-      }
-
-    pid1.set_dt((currentTime - g_prevTime) / 1000000.f);
+    pid1.set_dt(dt);
     pid1.set_input_filter_all(errorX);
-    speedCommand1 = pid1.get_pid();
-    posCommand1 = g_servo1.presentPos() + (currentTime - g_prevTime) / 1000000.f * speedCommand1;
-    g_servo1.setGoalPos(posCommand1);
+    speedCommand = pid1.get_pid();
+    posCommand = g_servo1.presentPos() + speedCommand * dt;
+    if (!skipFrames)
+      g_servo1.setGoalPos(posCommand);
 
-    g_speedSetpoint = speedCommand1; // debug
-    g_posCommand = posCommand1;
-    g_dt = (currentTime - g_prevTime) / 100000.f;
-
-    pid2.set_dt((currentTime - g_prevTime) / 1000000.f);
+    pid2.set_dt(dt);
     pid2.set_input_filter_all(-errorY);
-    speedCommand2 = pid2.get_pid();
-    posCommand2 = g_servo2.presentPos() + (currentTime - g_prevTime) / 1000000.f * speedCommand2;
-    g_servo2.setGoalPos(posCommand2);
+    speedCommand = pid2.get_pid();
+    posCommand = g_servo2.presentPos() + speedCommand * dt;
+    if (!skipFrames)
+      g_servo2.setGoalPos(posCommand);
 
-    g_prevTime = currentTime;
+    if (skipFrames)
+      --skipFrames;
+
+    overlayTrackingInfo(frame, face, errorX, errorY);
+
+    g_speedSetpoint = speedCommand; // debug
+    g_posCommand = posCommand;
+}
+
+float	idleGetSineOffset(float currentTime, float freq, float limit_low, float limit_high)
+{
+  return asin(2 * (g_servo1.presentPos() - ((limit_high - limit_low) / 2) - limit_low)
+	      / (limit_high - limit_low))
+         - (2 * M_PI * freq * currentTime);
+}
+
+void    idleActions(enum eState& state,
+		    FaceDetector& faceDetect,
+		    cv::Mat& frame,
+		    cv::Rect& box,
+		    float dt,
+		    bool& reset)
+{
+    static float offset;
+    float freq = 1.f / 50.f;
+    float currentTime = g_timer.getTime() / 1000000.f;
+    float limit_low = 0;
+    float limit_high = 1;
+
+    (void)dt;
+    if (reset)
+      {
+	offset = idleGetSineOffset(currentTime, freq, limit_low, limit_high);
+	reset = false;
+      }
+    g_servo1.setGoalPos((sin(2 * M_PI * freq * currentTime + offset)
+			 * ((limit_high - limit_low) / 2))
+			+ ((limit_high - limit_low) / 2)
+			+ limit_low);
+    box = faceDetect.detect(frame);
+    if (box.area() > 0)
+        state = TRACKING;
 }
 
 void    trackingActions(enum eState& state,
 			FaceTracker& tracker,
 			cv::Mat& frame,
-			cv::Rect& box)
+			cv::Rect& box,
+			float dt)
 {
-    static float    currentTime = g_timer.getTime();
-    static float    timeoutStart = 0;
+    static float    timeout = TIMEOUT_S;
     static bool     initialized = false;
+    static int      skipFrames = 0;
 
-    currentTime = g_timer.getTime();
     if (!initialized)
     {
-        timeoutStart = currentTime;
+        timeout = TIMEOUT_S;
         if (!tracker.init(frame, box))
         {
             std::cerr << "tracker init failed" << std::endl;
@@ -161,60 +174,101 @@ void    trackingActions(enum eState& state,
         }
         else
             initialized = true;
+	skipFrames = 1;
     }
     else
     {
-        if (currentTime - timeoutStart > TIMEOUT_S * 1000000)
+        if (timeout <= 0)
             std::cout << "************ Timeout ! ************" << std::endl;
         if (!tracker.update(frame, box)
-            || currentTime - timeoutStart > TIMEOUT_S * 1000000) // Timeout
+            || timeout <= 0)
         {
             tracker.release();
             initialized = false;
             state = IDLE;
             return;
         }
-        armCorrectPosition(frame, box);
+        armCorrectPosition(frame, box, dt, skipFrames);
+	timeout -= dt;
     }
 }
 
-int main()
+/*
+ * Returns time elapsed between two calls in seconds
+ */
+float	getDeltaTime()
 {
-    cv::VideoCapture        cap(1);
-    cv::Mat                 frame;
+  static float	prevTime = g_timer.getTime();
+  float		currentTime = g_timer.getTime();
+  float		dt;
+
+  dt = currentTime - prevTime;
+  prevTime = currentTime;
+  return dt / 1000000.f;
+}
+
+void	initServos()
+{
+    if (!g_servo1.init())
+      throw std::exception();
+    if (!g_servo2.init())
+      throw std::exception();
+
+    g_servo1.setCWAngleLimit(0);
+    g_servo1.setCCWAngleLimit(1); // Servo now set to joint mode
+    g_servo1.setMovingSpeed(0.5);
+
+    g_servo2.setCWAngleLimit(0.25);
+    g_servo2.setCCWAngleLimit(0.5); // Servo now set to joint mode
+    g_servo2.setMovingSpeed(0.5);
+
+    g_servo1.presentPos();
+    g_servo2.presentPos();
+    usleep(100000);
+}
+
+int	main()
+{
+    cv::VideoCapture        cap(0);
     FaceDetector            faceDetect("resources/haarcascade_frontalface_alt.xml");
     FaceTracker		    tracker;
+    cv::Mat                 frame;
     cv::Rect                box;
     enum eState             state = IDLE;
+    float                   dt;
+    bool                    idleReset = true;
 
     if (!DxlServo::devInit(0))
         errx(EXIT_FAILURE, "error: could not initialize dxl serial device %d", 0);
     if (!cap.isOpened())
         errx(EXIT_FAILURE, "error: could not open video capture");
+    initServos();
     cv::namedWindow("frame", cv::WINDOW_KEEPRATIO);
     while (cv::waitKey(30) < 0)
     {
         cap >> frame;
+	dt = getDeltaTime();
         switch (state)
         {
             case IDLE:
             std::cout << "idle..." << std::endl;
-                idleActions(state, faceDetect, frame, box);
+	    idleActions(state, faceDetect, frame, box, dt, idleReset);
                 break;
             case TRACKING:
                 std::cout << "tracking..." << std::endl;
-                trackingActions(state, tracker, frame, box);
+                trackingActions(state, tracker, frame, box, dt);
+		idleReset = true;
                 break;
         }
-        cv::rectangle(frame, box, cv::Scalar(127, 127, 0), 2, 2);
+	overlayFps(frame, dt);
         cv::imshow("frame", frame);
 	plot_stats(g_gp,
 		   g_timer.getTime(),
 		   g_speedSetpoint,
-		   g_servo1.presentSpeed(),
-		   g_servo1.presentPos(),
-		   g_posCommand,
-		   g_dt);
+		   g_servo2.presentSpeed(),
+		   g_servo2.presentPos(),
+		   g_servo1.goalPos(),
+		   dt);
     }
     return 0;
 }
