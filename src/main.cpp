@@ -238,8 +238,8 @@ int	main()
     float                   dt;
     bool                    idleReset = true;
 
-    if (!DxlServo::devInit(0))
-        errx(EXIT_FAILURE, "error: could not initialize dxl serial device %d", 0);
+    // if (!DxlServo::devInit(0))
+    //     errx(EXIT_FAILURE, "error: could not initialize dxl serial device %d", 0);
     if (!cap.isOpened())
         errx(EXIT_FAILURE, "error: could not open video capture");
     initServos();

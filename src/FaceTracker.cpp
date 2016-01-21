@@ -22,38 +22,55 @@
 
 #include "FaceTracker.hh"
 
-FaceTracker::FaceTracker()
-{
-  _tracker = cv::Tracker::create(TRACKER_TYPE);    //  "MIL", "BOOSTING", "MEDIANFLOW", "TLD"
-}
+FaceTracker::FaceTracker() {}
 
-FaceTracker::~FaceTracker()
-{
-  _tracker.release();
-}
+FaceTracker::~FaceTracker() {}
 
 bool	FaceTracker::init(cv::Mat& frame, cv::Rect& ref)
 {
-  bool	ret;
+  cv::Mat	grey(frame.rows, frame.cols, CV_8UC1);
 
-  _box2d = ref;
-  ret = _tracker->init(frame, _box2d);
-  ref = _box2d;
-  return ret;
+  cv::cvtColor(frame, grey, CV_BGR2GRAY);
+
+  _tracker.trackerEnabled = true;
+  _tracker.alternating = false;
+  _tracker.learningEnabled = true;
+
+  _tracker.detectorCascade->varianceFilter->enabled = true;
+  _tracker.detectorCascade->ensembleClassifier->enabled = true;
+  _tracker.detectorCascade->nnClassifier->enabled = true;
+  _tracker.detectorCascade->useShift = true;
+  _tracker.detectorCascade->shift = 0.1;
+  _tracker.detectorCascade->minScale = -10;
+  _tracker.detectorCascade->maxScale = 10;
+  _tracker.detectorCascade->minSize = 25;
+  _tracker.detectorCascade->numTrees = 10;
+  _tracker.detectorCascade->numFeatures = 13;
+  _tracker.detectorCascade->nnClassifier->thetaTP = 0.65;
+  _tracker.detectorCascade->nnClassifier->thetaFP = 0.5;
+
+  _tracker.detectorCascade->imgWidth = grey.cols;
+  _tracker.detectorCascade->imgHeight = grey.rows;
+  _tracker.detectorCascade->imgWidthStep = grey.step;
+
+  _tracker.selectObject(grey, &ref);
+
+  return this->update(frame, ref);
 }
 
 bool	FaceTracker::update(cv::Mat& frame, cv::Rect& ref)
 {
-  bool	ret;
-
-  _box2d = ref;
-  ret = _tracker->update(frame, _box2d);
-  ref = _box2d;
-  return ret;
+  _tracker.processImage(frame);
+  if (_tracker.currBB != NULL)
+  {
+    ref = *_tracker.currBB;
+  }
+  else
+    ref = cv::Rect();
+  return _tracker.currConf != 0;
 }
 
 void	FaceTracker::release()
 {
   _tracker.release();
-  _tracker = cv::Tracker::create(TRACKER_TYPE);
 }
