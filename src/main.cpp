@@ -26,14 +26,14 @@
 
 #include "gnuplot-iostream.h"
 
+#include "ConfigReader.hh"
 #include "DxlServo.hh"
 #include "FaceDetector.hh"
 #include "FaceTracker.hh"
 #include "PIDControl.hh"
 #include "Timer.hh"
 
-#define PLOT_MAX_S	30               // in second
-#define TIMEOUT_S       10               // Tracking timeout in seconds
+Gnuplot     g_gp;
 
 void	plot_stats(Gnuplot & gp,
 		   int x,
@@ -43,15 +43,15 @@ void	plot_stats(Gnuplot & gp,
 		   double y4,
 		   double y5);
 
-Gnuplot     g_gp;
+ConfigReader	g_config;
 
-Timer       g_timer;
+DxlServo	g_servo1(g_config.servo1Id());
+DxlServo	g_servo2(g_config.servo2Id());
 
-DxlServo    g_servo1(1);
-DxlServo    g_servo2(2);
+Timer		g_timer;
 
-float       g_speedSetpoint;	// Debug (for plotting curves)
-float       g_posCommand;	// Debug (for plotting curves)
+float		g_speedSetpoint;    // Debug (for plotting curves)
+float		g_posCommand;       // Debug (for plotting curves)
 
 enum eState
 {
@@ -88,8 +88,16 @@ void	overlayTrackingInfo(cv::Mat& frame, cv::Rect box, float errorX, float error
 
 void    armCorrectPosition(cv::Mat& frame, cv::Rect& face, float dt, int &skipFrames)
 {
-    static PIDControl	pid1(0.0015, 0, 0, 0, 10);
-    static PIDControl	pid2(0.0015, 0, 0, 0, 10);
+    static PIDControl	pid1(g_config.pid1P(),
+			     g_config.pid1I(),
+			     g_config.pid1D(),
+			     g_config.pid1Imax(),
+			     g_config.pid1filter_hz());
+    static PIDControl	pid2(g_config.pid2P(),
+			     g_config.pid2I(),
+			     g_config.pid2D(),
+			     g_config.pid2Imax(),
+			     g_config.pid2filter_hz());
     float               errorX = (frame.cols / 2.f) - (face.x + face.width / 2.f);
     float               errorY = (frame.rows / 2.f) - (face.y + face.height / 2.f);
     float		speedCommand;
@@ -115,7 +123,7 @@ void    armCorrectPosition(cv::Mat& frame, cv::Rect& face, float dt, int &skipFr
     overlayTrackingInfo(frame, face, errorX, errorY);
 
     g_speedSetpoint = speedCommand; // debug
-    g_posCommand = posCommand;
+    g_posCommand = posCommand;      // debug
 }
 
 float	idleGetSineOffset(float currentTime, float freq, float limit_low, float limit_high)
@@ -133,10 +141,10 @@ void    idleActions(enum eState& state,
 		    bool& reset)
 {
     static float offset;
-    float freq = 1.f / 50.f;
+    float freq = g_config.idleFreq();
     float currentTime = g_timer.getTime() / 1000000.f;
-    float limit_low = 0;
-    float limit_high = 1;
+    float limit_low = g_config.idleLimitLow();
+    float limit_high = g_config.idleLimitHigh();
 
     (void)dt;
     if (reset)
@@ -159,13 +167,13 @@ void    trackingActions(enum eState& state,
 			cv::Rect& box,
 			float dt)
 {
-    static float    timeout = TIMEOUT_S;
+    static float    timeout = g_config.timeout_s();
     static bool     initialized = false;
     static int      skipFrames = 0;
 
     if (!initialized)
     {
-        timeout = TIMEOUT_S;
+      timeout = g_config.timeout_s();
         if (!tracker.init(frame, box))
         {
             std::cerr << "tracker init failed" << std::endl;
@@ -214,13 +222,13 @@ void	initServos()
     if (!g_servo2.init())
       throw std::exception();
 
-    g_servo1.setCWAngleLimit(0);
-    g_servo1.setCCWAngleLimit(1); // Servo now set to joint mode
-    g_servo1.setMovingSpeed(0.5);
+    g_servo1.setCWAngleLimit(g_config.servo1CWAngleLimit());
+    g_servo1.setCCWAngleLimit(g_config.servo1CCWAngleLimit());
+    g_servo1.setMovingSpeed(g_config.servo1MovingSpeed());
 
-    g_servo2.setCWAngleLimit(0.25);
-    g_servo2.setCCWAngleLimit(0.5); // Servo now set to joint mode
-    g_servo2.setMovingSpeed(0.5);
+    g_servo2.setCWAngleLimit(g_config.servo2CWAngleLimit());
+    g_servo2.setCCWAngleLimit(g_config.servo2CCWAngleLimit());
+    g_servo2.setMovingSpeed(g_config.servo2MovingSpeed());
 
     g_servo1.presentPos();
     g_servo2.presentPos();
@@ -229,7 +237,7 @@ void	initServos()
 
 int	main()
 {
-    cv::VideoCapture        cap(0);
+    cv::VideoCapture        cap(g_config.captureIndex());
     FaceDetector            faceDetect("resources/haarcascade_frontalface_alt.xml");
     FaceTracker		    tracker;
     cv::Mat                 frame;
@@ -238,8 +246,9 @@ int	main()
     float                   dt;
     bool                    idleReset = true;
 
-    // if (!DxlServo::devInit(0))
-    //     errx(EXIT_FAILURE, "error: could not initialize dxl serial device %d", 0);
+    if (!DxlServo::devInit(g_config.servoDevIndex()))
+        errx(EXIT_FAILURE, "error: could not initialize dxl serial device %d",
+    	     g_config.servoDevIndex());
     if (!cap.isOpened())
         errx(EXIT_FAILURE, "error: could not open video capture");
     initServos();
@@ -251,8 +260,8 @@ int	main()
         switch (state)
         {
             case IDLE:
-            std::cout << "idle..." << std::endl;
-	    idleActions(state, faceDetect, frame, box, dt, idleReset);
+	        std::cout << "idle..." << std::endl;
+	        idleActions(state, faceDetect, frame, box, dt, idleReset);
                 break;
             case TRACKING:
                 std::cout << "tracking..." << std::endl;
@@ -282,7 +291,7 @@ void	plot_stats(Gnuplot & gp,
 		   double y5)
 {
   static double xmin = x;
-  static double xmax = x + (PLOT_MAX_S * 1000000);
+  static double xmax = x + (g_config.plotMax_s() * 1000000);
   static double ymin = y1;
   static double ymax = y1;
   static std::list<boost::tuple<double, double> > y1Data;
@@ -291,8 +300,8 @@ void	plot_stats(Gnuplot & gp,
   static std::list<boost::tuple<double, double> > y4Data;
   static std::list<boost::tuple<double, double> > y5Data;
 
-  if (xmax - xmin > (PLOT_MAX_S * 1000000))
-    xmin = xmax - (PLOT_MAX_S * 1000000);
+  if (xmax - xmin > (g_config.plotMax_s() * 1000000))
+    xmin = xmax - (g_config.plotMax_s() * 1000000);
   if (x >= xmax)
     xmax = x;
 
@@ -317,7 +326,8 @@ void	plot_stats(Gnuplot & gp,
   if (y5 >= ymax)
     ymax = y5;
 
-  while ((boost::get<0>(y1Data.back()) - boost::get<0>(y1Data.front())) > PLOT_MAX_S * 1000000)
+  while ((boost::get<0>(y1Data.back()) - boost::get<0>(y1Data.front()))
+	 > g_config.plotMax_s() * 1000000)
     {
       y1Data.pop_front();
       y2Data.pop_front();

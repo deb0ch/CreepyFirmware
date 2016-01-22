@@ -20,16 +20,8 @@
 # SOFTWARE.
 #
 
-SRCS		:=	FaceDetector.cpp	\
-			FaceTracker.cpp		\
-			main.cpp
+THIS_DIR_L0	:=	ConfigReader
 
-SUBDIRS		+=	ConfigReader		\
-			ExecFinder		\
-			PIDControl		\
-			Timer
+MOD_SRC		:=	ConfigReader.cpp
 
-include $(SRCDIR)/Timer/module.mk
-include $(SRCDIR)/PIDControl/module.mk
-include $(SRCDIR)/ConfigReader/module.mk
-include $(SRCDIR)/ExecFinder/module.mk
+SRCS		+= $(addprefix $(THIS_DIR_L0)/, $(MOD_SRC))

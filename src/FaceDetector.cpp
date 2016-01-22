@@ -22,7 +22,10 @@
 
 #include <err.h>
 
+#include "ConfigReader.hh"
 #include "FaceDetector.hh"
+
+extern ConfigReader	g_config;
 
 FaceDetector::FaceDetector(std::string cascadeName)
 {
@@ -41,10 +44,11 @@ std::vector<cv::Rect>   FaceDetector::detectMulti(cv::Mat &frame)
     cv::equalizeHist(gray, gray);                               // Todo: find out why that line
     _cascade.detectMultiScale(gray,
                               faces,
-                              1.1,               // Todo: why 1.1 ?
-                              7,		 // minNeighbors
-                              0, // cv::CASCADE_SCALE_IMAGE,
-                              cv::Size(30, 30)); // Todo: optimize size ?
+                              g_config.detectScaleFactor(),         // Todo: optimize
+                              g_config.detectMinNeighbors(),
+                              g_config.detectFlags(),               // cv::CASCADE_SCALE_IMAGE,
+                              cv::Size(g_config.detectMinSizeX(),
+				       g_config.detectMinSizeY())); // Todo: optimize size ?
     return faces;
 }
 

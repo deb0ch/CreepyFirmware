@@ -20,7 +20,10 @@
  * SOFTWARE.
  */
 
+#include "ConfigReader.hh"
 #include "FaceTracker.hh"
+
+extern ConfigReader	g_config;
 
 FaceTracker::FaceTracker() {}
 
@@ -32,22 +35,22 @@ bool	FaceTracker::init(cv::Mat& frame, cv::Rect& ref)
 
   cv::cvtColor(frame, grey, CV_BGR2GRAY);
 
-  _tracker.trackerEnabled = true;
-  _tracker.alternating = false;
-  _tracker.learningEnabled = true;
+  _tracker.trackerEnabled = g_config.trackerTrackerEnabled();
+  _tracker.alternating = g_config.trackerAlternating();
+  _tracker.learningEnabled = g_config.trackerLearningEnabled();
 
-  _tracker.detectorCascade->varianceFilter->enabled = true;
-  _tracker.detectorCascade->ensembleClassifier->enabled = true;
-  _tracker.detectorCascade->nnClassifier->enabled = true;
-  _tracker.detectorCascade->useShift = true;
-  _tracker.detectorCascade->shift = 0.1;
-  _tracker.detectorCascade->minScale = -10;
-  _tracker.detectorCascade->maxScale = 10;
-  _tracker.detectorCascade->minSize = 25;
-  _tracker.detectorCascade->numTrees = 10;
-  _tracker.detectorCascade->numFeatures = 13;
-  _tracker.detectorCascade->nnClassifier->thetaTP = 0.65;
-  _tracker.detectorCascade->nnClassifier->thetaFP = 0.5;
+  _tracker.detectorCascade->varianceFilter->enabled = g_config.trackerDetectorCascadeVarianceFilterEnabled();
+  _tracker.detectorCascade->ensembleClassifier->enabled = g_config.trackerDetectorCascadeEnsembleClassifierEnabled();
+  _tracker.detectorCascade->nnClassifier->enabled = g_config.trackerDetectorCascadeNNClassifierEnabled();
+  _tracker.detectorCascade->useShift = g_config.trackerDetectorCascadeUseShift();
+  _tracker.detectorCascade->shift = g_config.trackerDetectorCascadeShift();
+  _tracker.detectorCascade->minScale = g_config.trackerDetectorCascadeMinScale();
+  _tracker.detectorCascade->maxScale = g_config.trackerDetectorCascadeMaxScale();
+  _tracker.detectorCascade->minSize = g_config.trackerDetectorCascadeMinSize();
+  _tracker.detectorCascade->numTrees = g_config.trackerDetectorCascadeNumTrees();
+  _tracker.detectorCascade->numFeatures = g_config.trackerDetectorCascadeNumFeatures();
+  _tracker.detectorCascade->nnClassifier->thetaTP = g_config.trackerDetectorCascadeNNClassifierThetaTP();
+  _tracker.detectorCascade->nnClassifier->thetaFP = g_config.trackerDetectorCascadeNNClassifierThetaFP();
 
   _tracker.detectorCascade->imgWidth = grey.cols;
   _tracker.detectorCascade->imgHeight = grey.rows;
