@@ -66,6 +66,7 @@ ConfigReader::ConfigReader()
     _idleFreq(1.f / 30.f),
     _idleLimitLow(0),
     _idleLimitHigh(1),
+    _idleStartMovingVert_s(2),
     _detectScaleFactor(1.1),
     _detectMinNeighbors(5),
     _detectFlags(0),
@@ -159,6 +160,7 @@ void    ConfigReader::createConfigFile() const
   file << "idleFreq=" << _idleFreq << std::endl;
   file << "idleLimitLow=" << _idleLimitLow << std::endl;
   file << "idleLimitHigh=" << _idleLimitHigh << std::endl;
+  file << "idleStartMovingVert_s=" << _idleStartMovingVert_s << std::endl;
   file << std::endl;
   file << "detectScaleFactor=" << _detectScaleFactor << std::endl;
   file << "detectMinNeighbors=" << _detectMinNeighbors << std::endl;
@@ -269,6 +271,8 @@ void	ConfigReader::processLine(const std::string &line, int n)
       _idleLimitLow = std::stof(line.substr(line.find('=') + 1));
     else if (token == "idleLimitHigh")
       _idleLimitHigh = std::stof(line.substr(line.find('=') + 1));
+    else if (token == "idleStartMovingVert_s")
+      _idleStartMovingVert_s = std::stof(line.substr(line.find('=') + 1));
     else if (token == "detectScaleFactor")
       _detectScaleFactor = std::stof(line.substr(line.find('=') + 1));
     else if (token == "detectMinNeighbors")

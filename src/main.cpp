@@ -141,24 +141,40 @@ void    idleActions(enum eState& state,
 		    bool& reset)
 {
     static float offset;
-    float freq = g_config.idleFreq();
-    float currentTime = g_timer.getTime() / 1000000.f;
-    float limit_low = g_config.idleLimitLow();
-    float limit_high = g_config.idleLimitHigh();
+    static float startMovingVert_s = g_config.idleStartMovingVert_s();
+    static bool  going_up;
+    static float freq = g_config.idleFreq();
+    float        currentTime = g_timer.getTime() / 1000000.f;
+    float        limit_low = g_config.idleLimitLow();
+    float        limit_high = g_config.idleLimitHigh();
 
-    (void)dt;
     if (reset)
       {
 	offset = idleGetSineOffset(currentTime, freq, limit_low, limit_high);
+	offset -= going_up * M_PI;
+	startMovingVert_s = g_config.idleStartMovingVert_s();
 	reset = false;
       }
+    g_servo2.setMovingSpeed(0.005);
+    if (startMovingVert_s <= 0)
+    {
+      g_servo2.setGoalPos(g_config.servo2CWAngleLimit()
+			  + (g_config.servo2CCWAngleLimit() - g_config.servo2CWAngleLimit())
+			  / 1.5);
+    }
+    else
+      startMovingVert_s -= dt;
     g_servo1.setGoalPos((sin(2 * M_PI * freq * currentTime + offset)
 			 * ((limit_high - limit_low) / 2))
 			+ ((limit_high - limit_low) / 2)
 			+ limit_low);
     box = faceDetect.detect(frame);
     if (box.area() > 0)
+      {
+	g_servo2.setMovingSpeed(g_config.servo2MovingSpeed());
+	going_up = cos(2 * M_PI * freq * currentTime + offset) > 0;
         state = TRACKING;
+      }
 }
 
 void    trackingActions(enum eState& state,
