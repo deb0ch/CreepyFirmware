@@ -23,7 +23,10 @@
 #ifndef FACETRACKER_H_
 # define FACETRACKER_H_
 
-# include "TLD.h"
+# include <opencv2/opencv.hpp>
+# include <opencv2/tracking.hpp>
+
+# define TRACKER_TYPE    "MEDIANFLOW"
 
 class FaceTracker
 {
@@ -41,7 +44,8 @@ private:
   FaceTracker &operator=(const FaceTracker &);
 
 private:
-  tld::TLD		_tracker;
+  cv::Ptr<cv::Tracker>	_tracker;
+  cv::Rect2d		_box2d;                    // Type needed by tracker (wtf ?)
 };
 
 #endif /* !FACETRACKER_H_ */

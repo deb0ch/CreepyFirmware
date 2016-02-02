@@ -20,60 +20,40 @@
  * SOFTWARE.
  */
 
-#include "ConfigReader.hh"
 #include "FaceTracker.hh"
 
-extern ConfigReader	g_config;
+FaceTracker::FaceTracker()
+{
+  _tracker = cv::Tracker::create(TRACKER_TYPE);    //  "MIL", "BOOSTING", "MEDIANFLOW", "TLD"
+}
 
-FaceTracker::FaceTracker() {}
-
-FaceTracker::~FaceTracker() {}
+FaceTracker::~FaceTracker()
+{
+  _tracker.release();
+}
 
 bool	FaceTracker::init(cv::Mat& frame, cv::Rect& ref)
 {
-  cv::Mat	grey(frame.rows, frame.cols, CV_8UC1);
+  bool	ret;
 
-  cv::cvtColor(frame, grey, CV_BGR2GRAY);
-
-  _tracker.trackerEnabled = g_config.trackerTrackerEnabled();
-  _tracker.alternating = g_config.trackerAlternating();
-  _tracker.learningEnabled = g_config.trackerLearningEnabled();
-
-  _tracker.detectorCascade->varianceFilter->enabled = g_config.trackerDetectorCascadeVarianceFilterEnabled();
-  _tracker.detectorCascade->ensembleClassifier->enabled = g_config.trackerDetectorCascadeEnsembleClassifierEnabled();
-  _tracker.detectorCascade->nnClassifier->enabled = g_config.trackerDetectorCascadeNNClassifierEnabled();
-  _tracker.detectorCascade->useShift = g_config.trackerDetectorCascadeUseShift();
-  _tracker.detectorCascade->shift = g_config.trackerDetectorCascadeShift();
-  _tracker.detectorCascade->minScale = g_config.trackerDetectorCascadeMinScale();
-  _tracker.detectorCascade->maxScale = g_config.trackerDetectorCascadeMaxScale();
-  _tracker.detectorCascade->minSize = g_config.trackerDetectorCascadeMinSize();
-  _tracker.detectorCascade->numTrees = g_config.trackerDetectorCascadeNumTrees();
-  _tracker.detectorCascade->numFeatures = g_config.trackerDetectorCascadeNumFeatures();
-  _tracker.detectorCascade->nnClassifier->thetaTP = g_config.trackerDetectorCascadeNNClassifierThetaTP();
-  _tracker.detectorCascade->nnClassifier->thetaFP = g_config.trackerDetectorCascadeNNClassifierThetaFP();
-
-  _tracker.detectorCascade->imgWidth = grey.cols;
-  _tracker.detectorCascade->imgHeight = grey.rows;
-  _tracker.detectorCascade->imgWidthStep = grey.step;
-
-  _tracker.selectObject(grey, &ref);
-
-  return this->update(frame, ref);
+  _box2d = ref;
+  ret = _tracker->init(frame, _box2d);
+  ref = _box2d;
+  return ret;
 }
 
 bool	FaceTracker::update(cv::Mat& frame, cv::Rect& ref)
 {
-  _tracker.processImage(frame);
-  if (_tracker.currBB != NULL)
-  {
-    ref = *_tracker.currBB;
-  }
-  else
-    ref = cv::Rect();
-  return _tracker.currConf != 0;
+  bool	ret;
+
+  _box2d = ref;
+  ret = _tracker->update(frame, _box2d);
+  ref = _box2d;
+  return ret;
 }
 
 void	FaceTracker::release()
 {
   _tracker.release();
+  _tracker = cv::Tracker::create(TRACKER_TYPE);
 }
