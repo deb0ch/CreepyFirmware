@@ -142,25 +142,23 @@ void    idleActions(enum eState& state,
 {
     static float offset;
     static float startMovingVert_s = g_config.idleStartMovingVert_s();
-    static bool  going_up;
     static float freq = g_config.idleFreq();
     float        currentTime = g_timer.getTime() / 1000000.f;
+    static bool  going_up = cos(2 * M_PI * freq * currentTime) > 0;
     float        limit_low = g_config.idleLimitLow();
     float        limit_high = g_config.idleLimitHigh();
 
     if (reset)
       {
 	offset = idleGetSineOffset(currentTime, freq, limit_low, limit_high);
-	offset -= going_up * M_PI;
+	offset += !going_up * (M_PI - 2 * (2 * M_PI * freq * currentTime + offset)); // keep current direction
 	startMovingVert_s = g_config.idleStartMovingVert_s();
 	reset = false;
       }
-    g_servo2.setMovingSpeed(0.005);
+    g_servo2.setMovingSpeed(g_config.idleVertSpeed());
     if (startMovingVert_s <= 0)
     {
-      g_servo2.setGoalPos(g_config.servo2CWAngleLimit()
-			  + (g_config.servo2CCWAngleLimit() - g_config.servo2CWAngleLimit())
-			  / 1.5);
+      g_servo2.setGoalPos(g_config.idleVertPos());
     }
     else
       startMovingVert_s -= dt;
@@ -168,11 +166,11 @@ void    idleActions(enum eState& state,
 			 * ((limit_high - limit_low) / 2))
 			+ ((limit_high - limit_low) / 2)
 			+ limit_low);
+    going_up = cos(2 * M_PI * freq * currentTime + offset) > 0;
     box = faceDetect.detect(frame);
     if (box.area() > 0)
       {
 	g_servo2.setMovingSpeed(g_config.servo2MovingSpeed());
-	going_up = cos(2 * M_PI * freq * currentTime + offset) > 0;
         state = TRACKING;
       }
 }

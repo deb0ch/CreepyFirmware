@@ -67,6 +67,8 @@ ConfigReader::ConfigReader()
     _idleLimitLow(0),
     _idleLimitHigh(1),
     _idleStartMovingVert_s(2),
+    _idleVertPos(0.45),
+    _idleVertSpeed(0.015),
     _detectScaleFactor(1.1),
     _detectMinNeighbors(5),
     _detectFlags(0),
@@ -161,6 +163,8 @@ void    ConfigReader::createConfigFile() const
   file << "idleLimitLow=" << _idleLimitLow << std::endl;
   file << "idleLimitHigh=" << _idleLimitHigh << std::endl;
   file << "idleStartMovingVert_s=" << _idleStartMovingVert_s << std::endl;
+  file << "idleVertPos" << _idleVertPos << std::endl;
+  file << "idleVertSpeed" << _idleVertSpeed << std::endl;
   file << std::endl;
   file << "detectScaleFactor=" << _detectScaleFactor << std::endl;
   file << "detectMinNeighbors=" << _detectMinNeighbors << std::endl;
@@ -273,6 +277,10 @@ void	ConfigReader::processLine(const std::string &line, int n)
       _idleLimitHigh = std::stof(line.substr(line.find('=') + 1));
     else if (token == "idleStartMovingVert_s")
       _idleStartMovingVert_s = std::stof(line.substr(line.find('=') + 1));
+    else if (token == "idleVertPos")
+      _idleVertPos = std::stof(line.substr(line.find('=') + 1));
+    else if (token == "idleVertSpeed")
+      _idleVertSpeed = std::stof(line.substr(line.find('=') + 1));
     else if (token == "detectScaleFactor")
       _detectScaleFactor = std::stof(line.substr(line.find('=') + 1));
     else if (token == "detectMinNeighbors")

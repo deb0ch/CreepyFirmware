@@ -71,6 +71,8 @@ public:
   float		idleLimitLow() const			{ return _idleLimitLow; }
   float		idleLimitHigh() const			{ return _idleLimitHigh; }
   float		idleStartMovingVert_s() const		{ return _idleStartMovingVert_s; }
+  float		idleVertPos() const			{ return _idleVertPos; }
+  float		idleVertSpeed() const			{ return _idleVertSpeed; }
 
   double	detectScaleFactor() const		{ return _detectScaleFactor; }
   int		detectMinNeighbors() const		{ return _detectMinNeighbors; }
@@ -148,6 +150,8 @@ private:
   float		_idleLimitLow;
   float		_idleLimitHigh;
   float		_idleStartMovingVert_s;
+  float		_idleVertPos;
+  float		_idleVertSpeed;
 
   double	_detectScaleFactor;
   int		_detectMinNeighbors;
