@@ -52,7 +52,6 @@ CXXFLAGS		+= -I./$(SRCDIR)
 
 CXXFLAGS		+= -I./dxlservo/src
 CXXFLAGS		+= -I./dxlservo/dxl_sdk_usb2ax/include
-CXXFLAGS		+= -I./OpenTLD/src/libopentld/tld
 
 CXXFLAGS		+= $(shell pkg-config opencv --cflags)
 CXXFLAGS		+= $(addprefix -I./$(SRCDIR)/, $(SUBDIRS))
@@ -60,7 +59,6 @@ CXXFLAGS		+= $(addprefix -I./$(SRCDIR)/, $(SUBDIRS))
 LDFLAGS			+= -lboost_iostreams -lboost_system -lboost_filesystem
 LDFLAGS			+= $(shell pkg-config opencv --libs)
 LDFLAGS			+= -Ldxlservo -ldxlservo
-LDFLAGS			+= -L$(OPENTLD_BUILD)/lib -lopentld -lcvblobs
 
 debug: LDFLAGS		+= -g -g3 -ggdb
 
@@ -80,14 +78,6 @@ dxlservo:
 	@printf "[\033[0;34mBuilding library\033[0m] %s\n" "dxlservo"
 	@make -C dxlservo
 
-opentld:
-	@printf "[\033[0;34mBuilding library\033[0m] %s\n" "opentld"
-	mkdir -p $(OPENTLD_BUILD)
-	export OpenCV_DIR=/home/chauvo_t/lib/opencv/build/ 	;\
-	export OpenCV_FOUND=TRUE				;\
-	cmake -HOpenTLD -B$(OPENTLD_BUILD)
-	make -C $(OPENTLD_BUILD)
-
 -include $(DEPS)
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.c
@@ -98,7 +88,7 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.cpp
 	@printf "[\033[0;32mCompiling\033[0m] %s\n" $<
 	@$(COMPILE.cpp) $(OUTPUT_OPTION) $<
 
-$(NAME): $(OBJS) dxlservo opentld
+$(NAME): $(OBJS) dxlservo
 	@printf "[\033[0;33mLinker flags\033[0m] %s\n"
 	@echo $(LDFLAGS)
 	@printf "[\033[0;34mLinking\033[0m] %s\n" $(NAME)
@@ -129,4 +119,4 @@ fclean: clean
 
 re:	fclean all
 
-.PHONY:	all clean fclean re dxlservo opentld
+.PHONY:	all clean fclean re dxlservo

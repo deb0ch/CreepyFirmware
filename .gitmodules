@@ -1,6 +1,3 @@
 [submodule "dxlservo"]
 	path = dxlservo
 	url = https://deb0ch@bitbucket.org/deb0ch/dxlservo.git
-[submodule "OpenTLD"]
-	path = OpenTLD
-	url = https://github.com/gnebehay/OpenTLD.git
