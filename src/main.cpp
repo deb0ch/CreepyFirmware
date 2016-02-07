@@ -45,8 +45,8 @@ void	plot_stats(Gnuplot & gp,
 
 ConfigReader	g_config;
 
-DxlServo	g_servo1(g_config.servo1Id());
-DxlServo	g_servo2(g_config.servo2Id());
+DxlServo	g_servo1(g_config("servo1Id"));
+DxlServo	g_servo2(g_config("servo2Id"));
 
 Timer		g_timer;
 
@@ -88,16 +88,16 @@ void	overlayTrackingInfo(cv::Mat& frame, cv::Rect box, float errorX, float error
 
 void    armCorrectPosition(cv::Mat& frame, cv::Rect& face, float dt, int &skipFrames)
 {
-    static PIDControl	pid1(g_config.pid1P(),
-			     g_config.pid1I(),
-			     g_config.pid1D(),
-			     g_config.pid1Imax(),
-			     g_config.pid1filter_hz());
-    static PIDControl	pid2(g_config.pid2P(),
-			     g_config.pid2I(),
-			     g_config.pid2D(),
-			     g_config.pid2Imax(),
-			     g_config.pid2filter_hz());
+    static PIDControl	pid1(g_config("pid1P"),
+  			     g_config("pid1I"),
+			     g_config("pid1D"),
+			     g_config("pid1Imax"),
+			     g_config("pid1filter_hz"));
+    static PIDControl	pid2(g_config("pid2P"),
+			     g_config("pid2I"),
+			     g_config("pid2D"),
+			     g_config("pid2Imax"),
+			     g_config("pid2filter_hz"));
     float               errorX = (frame.cols / 2.f) - (face.x + face.width / 2.f);
     float               errorY = (frame.rows / 2.f) - (face.y + face.height / 2.f);
     float		speedCommand;
@@ -141,24 +141,24 @@ void    idleActions(enum eState& state,
 		    bool& reset)
 {
     static float offset;
-    static float startMovingVert_s = g_config.idleStartMovingVert_s();
-    static float freq = g_config.idleFreq();
+    static float startMovingVert_s = g_config("idleStartMovingVert_s");
+    static float freq = g_config("idleFreq");
     float        currentTime = g_timer.getTime() / 1000000.f;
     static bool  going_up = cos(2 * M_PI * freq * currentTime) > 0;
-    float        limit_low = g_config.idleLimitLow();
-    float        limit_high = g_config.idleLimitHigh();
+    float        limit_low = g_config("idleLimitLow");
+    float        limit_high = g_config("idleLimitHigh");
 
     if (reset)
       {
 	offset = idleGetSineOffset(currentTime, freq, limit_low, limit_high);
 	offset += !going_up * (M_PI - 2 * (2 * M_PI * freq * currentTime + offset)); // keep current direction
-	startMovingVert_s = g_config.idleStartMovingVert_s();
+	startMovingVert_s = g_config("idleStartMovingVert_s");
 	reset = false;
       }
-    g_servo2.setMovingSpeed(g_config.idleVertSpeed());
+    g_servo2.setMovingSpeed(g_config("idleVertSpeed"));
     if (startMovingVert_s <= 0)
     {
-      g_servo2.setGoalPos(g_config.idleVertPos());
+      g_servo2.setGoalPos(g_config("idleVertPos"));
     }
     else
       startMovingVert_s -= dt;
@@ -170,7 +170,7 @@ void    idleActions(enum eState& state,
     box = faceDetect.detect(frame);
     if (box.area() > 0)
       {
-	g_servo2.setMovingSpeed(g_config.servo2MovingSpeed());
+	g_servo2.setMovingSpeed(g_config("servo2MovingSpeed"));
         state = TRACKING;
       }
 }
@@ -181,13 +181,13 @@ void    trackingActions(enum eState& state,
 			cv::Rect& box,
 			float dt)
 {
-    static float    timeout = g_config.timeout_s();
+    static float    timeout = g_config("timeout_s");
     static bool     initialized = false;
     static int      skipFrames = 0;
 
     if (!initialized)
     {
-      timeout = g_config.timeout_s();
+        timeout = g_config("timeout_s");
         if (!tracker.init(frame, box))
         {
             std::cerr << "tracker init failed" << std::endl;
@@ -236,13 +236,13 @@ void	initServos()
     if (!g_servo2.init())
       throw std::exception();
 
-    g_servo1.setCWAngleLimit(g_config.servo1CWAngleLimit());
-    g_servo1.setCCWAngleLimit(g_config.servo1CCWAngleLimit());
-    g_servo1.setMovingSpeed(g_config.servo1MovingSpeed());
+    g_servo1.setCWAngleLimit(g_config("servo1CWAngleLimit"));
+    g_servo1.setCCWAngleLimit(g_config("servo1CCWAngleLimit"));
+    g_servo1.setMovingSpeed(g_config("servo1MovingSpeed"));
 
-    g_servo2.setCWAngleLimit(g_config.servo2CWAngleLimit());
-    g_servo2.setCCWAngleLimit(g_config.servo2CCWAngleLimit());
-    g_servo2.setMovingSpeed(g_config.servo2MovingSpeed());
+    g_servo2.setCWAngleLimit(g_config("servo2CWAngleLimit"));
+    g_servo2.setCCWAngleLimit(g_config("servo2CCWAngleLimit"));
+    g_servo2.setMovingSpeed(g_config("servo2MovingSpeed"));
 
     g_servo1.presentPos();
     g_servo2.presentPos();
@@ -251,7 +251,7 @@ void	initServos()
 
 int	main()
 {
-    cv::VideoCapture        cap(g_config.captureIndex());
+    cv::VideoCapture        cap(g_config("captureIndex"));
     FaceDetector            faceDetect("resources/haarcascade_frontalface_alt.xml");
     FaceTracker		    tracker;
     cv::Mat                 frame;
@@ -260,9 +260,9 @@ int	main()
     float                   dt;
     bool                    idleReset = true;
 
-    if (!DxlServo::devInit(g_config.servoDevIndex()))
+    if (!DxlServo::devInit(g_config("servoDevIndex")))
         errx(EXIT_FAILURE, "error: could not initialize dxl serial device %d",
-    	     g_config.servoDevIndex());
+    	     g_config("servoDevIndex"));
     if (!cap.isOpened())
         errx(EXIT_FAILURE, "error: could not open video capture");
     initServos();
@@ -305,7 +305,7 @@ void	plot_stats(Gnuplot & gp,
 		   double y5)
 {
   static double xmin = x;
-  static double xmax = x + (g_config.plotMax_s() * 1000000);
+  static double xmax = x + (g_config("plotMax_s") * 1000000);
   static double ymin = y1;
   static double ymax = y1;
   static std::list<boost::tuple<double, double> > y1Data;
@@ -314,8 +314,8 @@ void	plot_stats(Gnuplot & gp,
   static std::list<boost::tuple<double, double> > y4Data;
   static std::list<boost::tuple<double, double> > y5Data;
 
-  if (xmax - xmin > (g_config.plotMax_s() * 1000000))
-    xmin = xmax - (g_config.plotMax_s() * 1000000);
+  if (xmax - xmin > (g_config("plotMax_s") * 1000000))
+    xmin = xmax - (g_config("plotMax_s") * 1000000);
   if (x >= xmax)
     xmax = x;
 
@@ -341,7 +341,7 @@ void	plot_stats(Gnuplot & gp,
     ymax = y5;
 
   while ((boost::get<0>(y1Data.back()) - boost::get<0>(y1Data.front()))
-	 > g_config.plotMax_s() * 1000000)
+	 > g_config("plotMax_s") * 1000000)
     {
       y1Data.pop_front();
       y2Data.pop_front();

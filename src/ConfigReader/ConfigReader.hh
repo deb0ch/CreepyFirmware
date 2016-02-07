@@ -23,78 +23,20 @@
 #ifndef CONFIGREADER_H_
 # define CONFIGREADER_H_
 
+# include <map>
 # include <string>
 
 # define CONFIG_FILE_NAME "config.cfg"
 
+/*
+ * Todo: handle int and string parameters
+ */
 class ConfigReader
 {
 public:
-  int		servo1Id() const			{ return _servo1Id; }
-  int		servo2Id() const			{ return _servo2Id; }
+  float		operator()(std::string key) const;
 
-  float		servo1CWAngleLimit() const		{ return _servo1CWAngleLimit; }
-  float		servo1CCWAngleLimit() const		{ return _servo1CCWAngleLimit; }
-  float		servo1MovingSpeed() const		{ return _servo1MovingSpeed; }
-  float		servo1CWComplianceMargin() const	{ return _servo1CWComplianceMargin; }
-  float		servo1CCWComplianceMargin() const	{ return _servo1CCWComplianceMargin; }
-  float		servo1CWComplianceSlope() const		{ return _servo1CWComplianceSlope; }
-  float		servo1CCWComplianceSlope() const	{ return _servo1CCWComplianceSlope; }
-  float		servo1Punch() const			{ return _servo1Punch; }
-  float		pid1P() const				{ return _pid1P; }
-  float		pid1I() const				{ return _pid1I; }
-  float		pid1D() const				{ return _pid1D; }
-  float		pid1Imax() const			{ return _pid1Imax; }
-  float		pid1filter_hz() const			{ return _pid1filter_hz; }
-
-  float		servo2CWAngleLimit() const		{ return _servo2CWAngleLimit; }
-  float		servo2CCWAngleLimit() const		{ return _servo2CCWAngleLimit; }
-  float		servo2MovingSpeed() const		{ return _servo2MovingSpeed; }
-  float		servo2CWComplianceMargin() const	{ return _servo2CWComplianceMargin; }
-  float		servo2CCWComplianceMargin() const	{ return _servo2CCWComplianceMargin; }
-  float		servo2CWComplianceSlope() const		{ return _servo2CWComplianceSlope; }
-  float		servo2CCWComplianceSlope() const	{ return _servo2CCWComplianceSlope; }
-  float		servo2Punch() const			{ return _servo2Punch; }
-  float		pid2P() const				{ return _pid2P; }
-  float		pid2I() const				{ return _pid2I; }
-  float		pid2D() const				{ return _pid2D; }
-  float		pid2Imax() const			{ return _pid2Imax; }
-  float		pid2filter_hz() const			{ return _pid2filter_hz; }
-
-  float		plotMax_s() const			{ return _plotMax_s; }
-  float		timeout_s() const			{ return _timeout_s; }
-
-  int		captureIndex() const			{ return _captureIndex; }
-  int		servoDevIndex() const			{ return _servoDevIndex; }
-
-  float		idleFreq() const			{ return _idleFreq; }
-  float		idleLimitLow() const			{ return _idleLimitLow; }
-  float		idleLimitHigh() const			{ return _idleLimitHigh; }
-  float		idleStartMovingVert_s() const		{ return _idleStartMovingVert_s; }
-  float		idleVertPos() const			{ return _idleVertPos; }
-  float		idleVertSpeed() const			{ return _idleVertSpeed; }
-
-  double	detectScaleFactor() const		{ return _detectScaleFactor; }
-  int		detectMinNeighbors() const		{ return _detectMinNeighbors; }
-  int		detectFlags() const			{ return _detectFlags; }
-  int		detectMinSizeX() const			{ return _detectMinSizeX; }
-  int		detectMinSizeY() const			{ return _detectMinSizeY; }
-
-  int		trackerTrackerEnabled() const				{ return _trackerTrackerEnabled; }
-  int		trackerAlternating() const				{ return _trackerAlternating; }
-  int		trackerLearningEnabled() const				{ return _trackerLearningEnabled; }
-  int		trackerDetectorCascadeVarianceFilterEnabled() const	{ return _trackerDetectorCascadeVarianceFilterEnabled; }
-  int		trackerDetectorCascadeEnsembleClassifierEnabled() const	{ return _trackerDetectorCascadeEnsembleClassifierEnabled; }
-  int		trackerDetectorCascadeNNClassifierEnabled() const	{ return _trackerDetectorCascadeNNClassifierEnabled; }
-  int		trackerDetectorCascadeUseShift() const			{ return _trackerDetectorCascadeUseShift; }
-  float		trackerDetectorCascadeShift() const			{ return _trackerDetectorCascadeShift; }
-  float		trackerDetectorCascadeMinScale() const			{ return _trackerDetectorCascadeMinScale; }
-  float		trackerDetectorCascadeMaxScale() const			{ return _trackerDetectorCascadeMaxScale; }
-  float		trackerDetectorCascadeMinSize() const			{ return _trackerDetectorCascadeMinSize; }
-  int		trackerDetectorCascadeNumTrees() const			{ return _trackerDetectorCascadeNumTrees; }
-  int		trackerDetectorCascadeNumFeatures() const		{ return _trackerDetectorCascadeNumFeatures; }
-  float		trackerDetectorCascadeNNClassifierThetaTP() const	{ return _trackerDetectorCascadeNNClassifierThetaTP; }
-  float		trackerDetectorCascadeNNClassifierThetaFP() const	{ return _trackerDetectorCascadeNNClassifierThetaFP; }
+  void		registerParam(std::string key, float defaultValue = 0);
 
 public:
   ConfigReader();
@@ -105,75 +47,12 @@ private:
   ConfigReader &operator=(const ConfigReader &);
 
 private:
+  void		initConfig();
   void		createConfigFile() const;
   void		processLine(const std::string& line, int n);
 
 private:
-  int		_servo1Id;
-  int		_servo2Id;
-
-  float		_servo1CWAngleLimit;
-  float		_servo1CCWAngleLimit;
-  float		_servo1MovingSpeed;
-  float		_servo1CWComplianceMargin;
-  float		_servo1CCWComplianceMargin;
-  float		_servo1CWComplianceSlope;
-  float		_servo1CCWComplianceSlope;
-  float		_servo1Punch;
-  float		_pid1P;
-  float		_pid1I;
-  float		_pid1D;
-  float		_pid1Imax;
-  float		_pid1filter_hz;
-
-  float		_servo2CWAngleLimit;
-  float		_servo2CCWAngleLimit;
-  float		_servo2MovingSpeed;
-  float		_servo2CWComplianceMargin;
-  float		_servo2CCWComplianceMargin;
-  float		_servo2CWComplianceSlope;
-  float		_servo2CCWComplianceSlope;
-  float		_servo2Punch;
-  float		_pid2P;
-  float		_pid2I;
-  float		_pid2D;
-  float		_pid2Imax;
-  float		_pid2filter_hz;
-
-  float		_plotMax_s;
-  float		_timeout_s;
-
-  int		_captureIndex;
-  int		_servoDevIndex;
-
-  float		_idleFreq;
-  float		_idleLimitLow;
-  float		_idleLimitHigh;
-  float		_idleStartMovingVert_s;
-  float		_idleVertPos;
-  float		_idleVertSpeed;
-
-  double	_detectScaleFactor;
-  int		_detectMinNeighbors;
-  int		_detectFlags;
-  int		_detectMinSizeX;
-  int		_detectMinSizeY;
-
-  int		_trackerTrackerEnabled;
-  int		_trackerAlternating;
-  int		_trackerLearningEnabled;
-  int		_trackerDetectorCascadeVarianceFilterEnabled;
-  int		_trackerDetectorCascadeEnsembleClassifierEnabled;
-  int		_trackerDetectorCascadeNNClassifierEnabled;
-  int		_trackerDetectorCascadeUseShift;
-  float		_trackerDetectorCascadeShift;
-  float		_trackerDetectorCascadeMinScale;
-  float		_trackerDetectorCascadeMaxScale;
-  float		_trackerDetectorCascadeMinSize;
-  int		_trackerDetectorCascadeNumTrees;
-  int		_trackerDetectorCascadeNumFeatures;
-  float		_trackerDetectorCascadeNNClassifierThetaTP;
-  float		_trackerDetectorCascadeNNClassifierThetaFP;
+  std::map<std::string, float>	_params;
 };
 
 #endif /* !CONFIGREADER_H_ */
